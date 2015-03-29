@@ -1,5 +1,4 @@
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 
@@ -41,28 +40,21 @@ public class KdTree {
         }
 
         if (!contains(p)) {
-            root = doPut(root, p, true, new RectHV(0, 0, 1, 1));
+            root = doPut(root, p, true);
         }
     }
 
-    private Node<Double, Point2D> doPut(Node<Double, Point2D> x, Point2D p, boolean xLevel, RectHV area) {
+    private Node<Double, Point2D> doPut(Node<Double, Point2D> x, Point2D p, boolean xLevel) {
         if (x == null) {
-            return new Node<Double, Point2D>(xLevel ? p.x() : p.y(), p, null, null, xLevel, 1, area);
+            return new Node<Double, Point2D>(xLevel ? p.x() : p.y(), p, null, null, xLevel, 1);
         }
 
         Comparator<Point2D> comparator = x.isxLevel() ? X_ORDER : Y_ORDER;
         int compare = comparator.compare(p, x.getValue());
-        double splitValue = x.isxLevel() ? x.getValue().x() : x.getValue().y();
         if (compare <= 0 ) {
-            RectHV leftArea = x.isxLevel() ?
-                new RectHV(area.xmin(), area.ymin(), splitValue, area.ymax()) :
-                new RectHV(area.xmin(), area.ymin(), area.xmax(), splitValue);
-            x.left = doPut(x.left, p, !xLevel, leftArea);
+            x.left = doPut(x.left, p, !xLevel);
         } else if (compare > 0) {
-            RectHV rightArea = x.isxLevel() ?
-                new RectHV(splitValue, area.ymin(), area.xmax(), area.ymax()) :
-                new RectHV(area.xmin(), splitValue, area.xmax(), area.ymax());
-            x.right = doPut(x.right, p, !xLevel, rightArea);
+            x.right = doPut(x.right, p, !xLevel);
         }
 
         x.N = 1 + size(x.left) + size(x.right);
@@ -168,15 +160,15 @@ public class KdTree {
         if (isEmpty()) {
             return null;
         }
-        return doNearest(p, root, root).getValue();
+        return doNearest(p, root, root, new RectHV(0, 0, 1, 1)).getValue();
     }
 
-    private Node<Double, Point2D> doNearest(Point2D p, Node<Double, Point2D> x, Node<Double, Point2D> nearest) {
+    private Node<Double, Point2D> doNearest(Point2D p, Node<Double, Point2D> x, Node<Double, Point2D> nearest, RectHV area) {
         if (x == null) {
             return nearest;
         }
-        double distance = p.distanceTo(nearest.getValue());
-        double dist = p.distanceTo(x.getValue());
+        double distance = p.distanceSquaredTo(nearest.getValue());
+        double dist = p.distanceSquaredTo(x.getValue());
         if (dist < distance) {
             nearest = x;
             distance = dist;
@@ -185,15 +177,22 @@ public class KdTree {
         double splitValue = x.isxLevel() ? x.getValue().x() : x.getValue().y();
         double value = x.isxLevel() ? p.x() : p.y();
 
+        RectHV leftArea = x.isxLevel() ?
+            new RectHV(area.xmin(), area.ymin(), splitValue, area.ymax()) :
+            new RectHV(area.xmin(), area.ymin(), area.xmax(), splitValue);
+
+        RectHV rightArea = x.isxLevel() ?
+            new RectHV(splitValue, area.ymin(), area.xmax(), area.ymax()) :
+            new RectHV(area.xmin(), splitValue, area.xmax(), area.ymax());
         if (value < splitValue) {
-            nearest = doNearest(p, x.left, nearest);
-            if (x.right != null && x.right.getArea().distanceTo(p) < distance) {
-                nearest = doNearest(p, x.right, nearest);
+            nearest = doNearest(p, x.left, nearest, leftArea);
+            if (x.right != null && rightArea.distanceSquaredTo(p) < distance) {
+                nearest = doNearest(p, x.right, nearest, rightArea);
             }
         } else {
-            nearest = doNearest(p, x.right, nearest);
-            if (x.left != null && x.left.getArea().distanceTo(p) < distance) {
-                nearest = doNearest(p, x.left, nearest);
+            nearest = doNearest(p, x.right, nearest, rightArea);
+            if (x.left != null && leftArea.distanceSquaredTo(p) < distance) {
+                nearest = doNearest(p, x.left, nearest, leftArea);
             }
         }
         return nearest;
@@ -205,16 +204,14 @@ public class KdTree {
         private Node<Key, Value> left, right;
         private int N;
         private final boolean xLevel;
-        private RectHV area;
 
-        public Node(Key key, Value value, Node<Key, Value> left, Node<Key, Value> right, boolean xLevel, int n, RectHV area) {
+        public Node(Key key, Value value, Node<Key, Value> left, Node<Key, Value> right, boolean xLevel, int n) {
             this.key = key;
             this.value = value;
             this.left = left;
             this.right = right;
             this.xLevel = xLevel;
             this.N = n;
-            this.area = area;
         }
 
         public Key getKey() {
@@ -239,10 +236,6 @@ public class KdTree {
 
         public int getN() {
             return N;
-        }
-
-        public RectHV getArea() {
-            return area;
         }
     }
 
